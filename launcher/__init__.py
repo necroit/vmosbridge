@@ -84,7 +84,7 @@ class RobloxLauncher:
         # Try multiple methods to stop the app
         methods = [
             f'pkill -f {package}',  # Method 1: pkill by package name
-            f'killall {package.split(\".\")[-1]}',  # Method 2: killall by app name
+            f"killall {package.split('.') [-1]}",  # Method 2: killall by app name
         ]
         
         for cmd in methods:
