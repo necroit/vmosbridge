@@ -1,10 +1,60 @@
 from config import load_config, save_config
+import subprocess
+import sys
+import os
 
 def ask(msg):
     return input(msg + ": ").strip()
 
+def check_dependencies():
+    """Check and install dependencies."""
+    print("\n=== Checking dependencies ===")
+    
+    try:
+        import telethon
+        print("✅ Telethon installed")
+    except ImportError:
+        print("❌ Telethon not found. Installing...")
+        subprocess.run([sys.executable, '-m', 'pip', 'install', 'telethon'], check=True)
+        print("✅ Telethon installed")
+
+def setup_termux_autostart():
+    """Setup Termux autostart script."""
+    try:
+        boot_dir = os.path.expanduser('~/.termux/boot')
+        boot_script = os.path.join(boot_dir, 'start.sh')
+        
+        os.makedirs(boot_dir, exist_ok=True)
+        
+        if not os.path.exists(boot_script):
+            project_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            autostart_content = f'''#!/data/data/com.termux/files/usr/bin/bash
+
+# VMOS Bridge Bot Autostart
+cd "{project_dir}"
+sleep 5
+python main.py >> ~/vmosbridge.log 2>&1 &
+exit 0
+'''
+            
+            with open(boot_script, 'w') as f:
+                f.write(autostart_content)
+            
+            os.chmod(boot_script, 0o755)
+            
+            print("\n✅ Autostart configured")
+            print("📝 Install 'Termux:Boot' app for automatic startup\n")
+    except Exception as e:
+        print(f"\n⚠️ Could not setup autostart: {e}\n")
+
 def main():
+    # Check dependencies first
+    check_dependencies()
+    
     print("\n=== FIRST SETUP ===\n")
+    print("Get API credentials from https://my.telegram.org/")
+    print("Get Bot Token from @BotFather\n")
 
     cfg = load_config()
 
@@ -29,6 +79,9 @@ def main():
     save_config(cfg)
 
     print("\nDONE. Config saved.\n")
+    
+    # Setup autostart
+    setup_termux_autostart()
 
 if __name__ == "__main__":
     main()
