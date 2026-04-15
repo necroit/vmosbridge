@@ -183,6 +183,38 @@ class TelegramBot:
             except Exception as e:
                 await event.reply(f"Ошибка перезагрузки: {e}")
 
+        @self.client.on(events.NewMessage(pattern=r'^/installtools$'))
+        async def install_tools_command(event):
+            if not self.is_admin(event):
+                await event.reply("Access denied. Only admin can use this bot.")
+                return
+            await event.reply("Устанавливаю инструменты для клонирования...")
+            try:
+                commands = [
+                    'pkg update',
+                    'pkg install apktool openjdk-17 apksigner',
+                ]
+                for cmd in commands:
+                    result = subprocess.run(cmd, shell=True, timeout=300, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        await event.reply(f"Ошибка установки: {result.stderr}")
+                        return
+                await event.reply("✅ Инструменты установлены: apktool, openjdk-17, apksigner")
+            except Exception as e:
+                await event.reply(f"Ошибка установки инструментов: {e}")
+
+        @self.client.on(events.NewMessage(pattern=r'^/clone$'))
+        async def clone_command(event):
+            if not self.is_admin(event):
+                await event.reply("Access denied. Only admin can use this bot.")
+                return
+            await event.reply("Начинаю клонирование Roblox...\n\nТребуемые инструменты: apktool, openjdk, apksigner\nУстановите командой: pkg install apktool openjdk-17 apksigner")
+            try:
+                result = await self.clone_roblox()
+                await event.reply(result)
+            except Exception as e:
+                await event.reply(f"Ошибка клонирования: {e}")
+
         logging.info("Bot started")
         await self.send_start_message()
 
@@ -200,6 +232,97 @@ class TelegramBot:
             await self.client.send_message(self.admin_id, message)
         except Exception as e:
             logging.error(f"Failed to send startup notification: {e}")
+
+    async def clone_roblox(self):
+        """Clone Roblox by downloading APK, modifying package name, and installing."""
+        try:
+            import tempfile
+            import os
+
+            # Create temp directory
+            with tempfile.TemporaryDirectory() as temp_dir:
+                apk_path = os.path.join(temp_dir, 'roblox.apk')
+                cloned_apk_path = os.path.join(temp_dir, 'roblox_cloned.apk')
+
+                # Step 1: Download Roblox APK
+                download_commands = [
+                    f'curl -L "https://www.roblox.com/mobile-app" -o {apk_path}',
+                    f'wget -O {apk_path} "https://www.roblox.com/mobile-app"',
+                ]
+
+                downloaded = False
+                for cmd in download_commands:
+                    result = subprocess.run(cmd, shell=True, timeout=60, capture_output=True, text=True)
+                    if result.returncode == 0 and os.path.exists(apk_path):
+                        downloaded = True
+                        break
+
+                if not downloaded:
+                    return "❌ Не удалось скачать APK Roblox"
+
+                # Step 2: Check if apktool is available
+                apktool_check = subprocess.run('apktool version', shell=True, capture_output=True, text=True)
+                if apktool_check.returncode != 0:
+                    return "❌ apktool не установлен. Установите apktool для клонирования"
+
+                # Step 3: Decompile APK
+                decompile_dir = os.path.join(temp_dir, 'decompiled')
+                decompile_cmd = f'apktool d -f -o {decompile_dir} {apk_path}'
+                result = subprocess.run(decompile_cmd, shell=True, timeout=120, capture_output=True, text=True)
+                if result.returncode != 0:
+                    return f"❌ Ошибка декомпиляции APK: {result.stderr}"
+
+                # Step 4: Modify AndroidManifest.xml
+                manifest_path = os.path.join(decompile_dir, 'AndroidManifest.xml')
+                if os.path.exists(manifest_path):
+                    with open(manifest_path, 'r', encoding='utf-8') as f:
+                        manifest_content = f.read()
+
+                    # Change package name (add suffix)
+                    import re
+                    manifest_content = re.sub(
+                        r'package="([^"]+)"',
+                        r'package="\1.cloned"',
+                        manifest_content
+                    )
+
+                    with open(manifest_path, 'w', encoding='utf-8') as f:
+                        f.write(manifest_content)
+
+                # Step 5: Recompile APK
+                rebuild_cmd = f'apktool b -f -o {cloned_apk_path} {decompile_dir}'
+                result = subprocess.run(rebuild_cmd, shell=True, timeout=120, capture_output=True, text=True)
+                if result.returncode != 0:
+                    return f"❌ Ошибка пересборки APK: {result.stderr}"
+
+                # Step 6: Sign APK (if apksigner available)
+                signed_apk_path = os.path.join(temp_dir, 'roblox_cloned_signed.apk')
+
+                # Try to sign with apksigner
+                sign_cmd = f'apksigner sign --ks /dev/null --ks-pass pass:android --out {signed_apk_path} {cloned_apk_path}'
+                result = subprocess.run(sign_cmd, shell=True, timeout=30, capture_output=True, text=True)
+
+                if result.returncode != 0:
+                    # Fallback: try jarsigner
+                    jarsign_cmd = f'jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore /dev/null -storepass android -keypass android {cloned_apk_path} androiddebugkey'
+                    result = subprocess.run(jarsign_cmd, shell=True, timeout=30, capture_output=True, text=True)
+                    if result.returncode == 0:
+                        signed_apk_path = cloned_apk_path
+                    else:
+                        return "❌ Не удалось подписать APK"
+
+                # Step 7: Install APK
+                install_cmd = f'pm install -r {signed_apk_path}'
+                result = subprocess.run(install_cmd, shell=True, timeout=60, capture_output=True, text=True)
+                if result.returncode == 0:
+                    # Refresh packages list
+                    self.launcher.packages = self.launcher.find_roblox_packages()
+                    return "✅ Roblox успешно клонирован и установлен!"
+                else:
+                    return f"❌ Ошибка установки APK: {result.stderr}"
+
+        except Exception as e:
+            return f"❌ Ошибка клонирования: {str(e)}"
 
     def get_system_status(self):
         """Get system status: memory, running processes, etc."""
