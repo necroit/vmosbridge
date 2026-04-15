@@ -80,6 +80,19 @@ class RobloxLauncher:
         """Stop all Roblox processes."""
         if not package:
             package = self.select_package()
-        command = f'am force-stop {package}'
-        success, output = run_command(command)
-        return success
+        
+        # Try multiple methods to stop the app
+        methods = [
+            f'pkill -f {package}',  # Method 1: pkill by package name
+            f'killall {package.split(\".\")[-1]}',  # Method 2: killall by app name
+        ]
+        
+        for cmd in methods:
+            try:
+                result = subprocess.run(cmd, shell=True, timeout=5, capture_output=True)
+                if result.returncode == 0 or 'No such process' not in result.stderr:
+                    return True
+            except Exception:
+                continue
+        
+        return False
