@@ -80,8 +80,13 @@ def main():
 
     print("\nDONE. Config saved.\n")
     
-    # Setup autostart
-    setup_termux_autostart()
+    # Optional: Setup autostart (user can do it manually)
+    print("\n=== Optional: Autostart Setup ===")
+    setup_autostart = input("Setup autostart for Termux? (Y/N): ").strip().lower()
+    if setup_autostart == 'y':
+        setup_termux_autostart()
+    else:
+        print("⏭️  Skipped. You can manually set it up later.")
 
 if __name__ == "__main__":
     main()
