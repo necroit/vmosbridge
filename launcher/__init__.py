@@ -1,13 +1,43 @@
 import asyncio
+import subprocess
 import time
 from utils import run_command, delay
 
 class RobloxLauncher:
     def __init__(self, config):
         self.config = config
-        self.package = "com.roblox.client"
+        self.packages = self.find_roblox_packages()
 
-    async def launch_instance(self, link):
+    def find_roblox_packages(self):
+        """Find all Roblox-related packages on device."""
+        try:
+            result = subprocess.run(['pm', 'list', 'packages'], capture_output=True, text=True)
+            packages = [line.split(':')[1] for line in result.stdout.split('\n') if 'roblox' in line.lower()]
+            return packages
+        except Exception:
+            return ['com.roblox.client']  # Fallback
+
+    def select_package(self):
+        """Let user select Roblox package if multiple found."""
+        if len(self.packages) == 1:
+            return self.packages[0]
+        elif len(self.packages) > 1:
+            print("\n=== Found multiple Roblox packages ===")
+            for i, pkg in enumerate(self.packages):
+                print(f"{i+1}. {pkg}")
+            while True:
+                try:
+                    choice = int(input("Select package number: ")) - 1
+                    if 0 <= choice < len(self.packages):
+                        return self.packages[choice]
+                except ValueError:
+                    pass
+                print("Invalid choice. Try again.")
+        else:
+            print("No Roblox packages found. Using default.")
+            return 'com.roblox.client'
+
+    async def launch_instance(self, link, package):
         """Launch a single Roblox instance with the given link."""
         command = f'am start -a android.intent.action.VIEW -d "{link}"'
         success, output = run_command(command)
@@ -15,20 +45,23 @@ class RobloxLauncher:
 
     async def launch_all(self):
         """Launch multiple instances with delay."""
+        package = self.select_package()
         links = self.config.get('roblox_links', [])
         instances = self.config.get('instances', 1)
         delay_sec = self.config.get('delay', 1)
 
         for i in range(min(instances, len(links))):
             link = links[i % len(links)]  # Cycle through links if more instances than links
-            if await self.launch_instance(link):
+            if await self.launch_instance(link, package):
                 if i < instances - 1:  # Don't delay after last
                     await asyncio.sleep(delay_sec)
             else:
                 break  # Stop if launch fails
 
-    async def stop_all(self):
+    async def stop_all(self, package=None):
         """Stop all Roblox processes."""
-        command = f'am force-stop {self.package}'
+        if not package:
+            package = self.select_package()
+        command = f'am force-stop {package}'
         success, output = run_command(command)
         return success

@@ -83,9 +83,13 @@ class TelegramBot:
             mem_lines = mem_result.stdout.split('\n')[:3]  # First 3 lines
             mem_info = '\n'.join(mem_lines)
 
-            # Roblox processes
-            ps_result = subprocess.run(['ps'], capture_output=True, text=True)
-            roblox_processes = [line for line in ps_result.stdout.split('\n') if 'roblox' in line.lower()]
+            # Roblox processes - check all found packages
+            roblox_processes = []
+            for pkg in self.launcher.packages:
+                ps_result = subprocess.run(['ps'], capture_output=True, text=True)
+                pkg_processes = [line for line in ps_result.stdout.split('\n') if pkg in line.lower()]
+                roblox_processes.extend(pkg_processes)
+
             roblox_count = len(roblox_processes)
 
             status = f"🖥️ System Status:\n\n📊 Memory:\n{mem_info}\n\n🎮 Roblox Processes: {roblox_count} running"
