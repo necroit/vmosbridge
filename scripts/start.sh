@@ -33,7 +33,7 @@ sleep 5
 
 # Start bot in background
 echo "[$(date)] Starting bot..." >> "$LOG_FILE"
-python main.py >> "$LOG_FILE" 2>&1 &
+python main.py --boot >> "$LOG_FILE" 2>&1 &
 
 echo "[$(date)] Bot started (PID: $!)" >> "$LOG_FILE"
 exit 0

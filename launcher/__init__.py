@@ -18,29 +18,33 @@ class RobloxLauncher:
             return ['com.roblox.client']  # Fallback
 
     def select_package(self):
-        """Let user select Roblox package if multiple found."""
-        if len(self.packages) == 1:
-            return self.packages[0]
-        elif len(self.packages) > 1:
-            print("\n=== Found multiple Roblox packages ===")
-            for i, pkg in enumerate(self.packages):
-                print(f"{i+1}. {pkg}")
-            while True:
-                try:
-                    choice = int(input("Select package number: ")) - 1
-                    if 0 <= choice < len(self.packages):
-                        return self.packages[choice]
-                except ValueError:
-                    pass
-                print("Invalid choice. Try again.")
-        else:
-            print("No Roblox packages found. Using default.")
-            return 'com.roblox.client'
+        """Return the currently selected Roblox package."""
+        selected = self.get_selected_package()
+        if selected:
+            return selected
+        return 'com.roblox.client'
+
+    def get_selected_package(self):
+        if not self.packages:
+            return None
+        if getattr(self, 'selected_package_index', None) is None or self.selected_package_index >= len(self.packages):
+            self.selected_package_index = 0
+        return self.packages[self.selected_package_index]
+
+    def set_selected_package(self, index):
+        if not self.packages:
+            raise ValueError("No Roblox packages available")
+        if index < 0 or index >= len(self.packages):
+            raise ValueError("Invalid package index")
+        self.selected_package_index = index
+        return self.packages[index]
+
+    def list_packages(self):
+        return self.packages
 
     async def launch_instance(self, link, package):
         """Launch a single Roblox instance with the given link."""
-        # Use basic Android intent launch; Freeform mode is enabled separately via settings
-        command = f'am start -a android.intent.action.VIEW -d "{link}"'
+        command = f'am start -a android.intent.action.VIEW -d "{link}" -p "{package}"'
         success, output = run_command(command)
         return success
 
@@ -58,41 +62,48 @@ class RobloxLauncher:
         except Exception:
             return None  # Error
 
-    async def launch_all(self):
-        """Launch multiple instances with delay in Freeform window."""
-        # Check and enable Freeform mode
-        freeform_status = self.check_and_enable_freeform()
-        
-        package = self.select_package()
-        links = self.config.get('roblox_links', [])
-        instances = self.config.get('instances', 1)
-        delay_sec = self.config.get('delay', 1)
+    async def launch_all(self, package=None, instances=None, delay_sec=None):
+        """Launch configured Roblox instances for a selected package."""
+        self.check_and_enable_freeform()
+        package = package or self.select_package()
+        if not package:
+            return False
 
+        links = self.config.get('roblox_links', [])
+        instances = instances if instances is not None else self.config.get('instances', 1)
+        delay_sec = delay_sec if delay_sec is not None else self.config.get('delay', 1)
+
+        launched = 0
         for i in range(min(instances, len(links))):
-            link = links[i % len(links)]  # Cycle through links if more instances than links
+            link = links[i % len(links)]
             if await self.launch_instance(link, package):
-                if i < instances - 1:  # Don't delay after last
+                launched += 1
+                if i < instances - 1:
                     await asyncio.sleep(delay_sec)
             else:
-                break  # Stop if launch fails
+                break
+
+        return launched > 0
 
     async def stop_all(self, package=None):
-        """Stop all Roblox processes."""
-        if not package:
-            package = self.select_package()
+        """Stop Roblox processes for one or all packages."""
+        targets = [package] if package else self.packages
+        if not targets:
+            targets = ['com.roblox.client']
         
-        # Try multiple methods to stop the app
-        methods = [
-            f'pkill -f {package}',  # Method 1: pkill by package name
-            f'killall {package.split('.')[-1]}',  # Method 2: killall by app name
-        ]
-        
-        for cmd in methods:
-            try:
-                result = subprocess.run(cmd, shell=True, timeout=5, capture_output=True)
-                if result.returncode == 0 or 'No such process' not in result.stderr:
-                    return True
-            except Exception:
-                continue
-        
-        return False
+        stopped_any = False
+        for target in targets:
+            methods = [
+                f'pkill -f {target}',
+                f'killall {target.split('.')[-1]}',
+            ]
+            for cmd in methods:
+                try:
+                    result = subprocess.run(cmd, shell=True, timeout=5, capture_output=True)
+                    stderr = result.stderr.decode('utf-8', errors='ignore') if isinstance(result.stderr, bytes) else str(result.stderr)
+                    if result.returncode == 0 or 'No such process' not in stderr:
+                        stopped_any = True
+                        break
+                except Exception:
+                    continue
+        return stopped_any

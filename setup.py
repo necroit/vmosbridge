@@ -34,7 +34,7 @@ def setup_termux_autostart():
 # VMOS Bridge Bot Autostart
 cd "{project_dir}"
 sleep 5
-python main.py >> ~/vmosbridge.log 2>&1 &
+python main.py --boot >> ~/vmosbridge.log 2>&1 &
 exit 0
 '''
             

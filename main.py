@@ -74,5 +74,10 @@ print("\n" + "="*50)
 print("Starting bot...")
 print("="*50 + "\n")
 
-bot = TelegramBot()
+boot_mode = '--boot' in sys.argv
+optimize_only = '--optimize' in sys.argv
+bot = TelegramBot(boot_mode=boot_mode)
+if optimize_only:
+    print(bot.optimize_system())
+    sys.exit(0)
 asyncio.run(bot.start_bot())
