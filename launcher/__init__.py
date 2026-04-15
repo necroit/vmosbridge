@@ -44,23 +44,40 @@ class RobloxLauncher:
 
     async def launch_instance(self, link, package):
         """Launch a single Roblox instance with the given link."""
-        command = f'am start -a android.intent.action.VIEW -d "{link}" -p "{package}"'
-        success, output = run_command(command)
-        return success
+        commands = [
+            f'am start -a android.intent.action.VIEW -d "{link}" -p "{package}" -f 0x10200000',
+            f'am start -a android.intent.action.VIEW -d "{link}" -p "{package}" -f 0x18000000',
+            f'am start -a android.intent.action.VIEW -d "{link}" -p "{package}"',
+        ]
+        for command in commands:
+            success, output = run_command(command)
+            if success:
+                return True
+        return False
 
     def check_and_enable_freeform(self):
         """Check if Freeform is enabled, if not - enable it."""
+        enabled = False
         try:
-            # Check if Freeform is enabled
-            result = subprocess.run(['settings', 'get', 'global', 'enable_freeform_windows'], 
-                                  capture_output=True, text=True, timeout=5)
+            result = subprocess.run(['settings', 'get', 'global', 'enable_freeform_windows'],
+                                    capture_output=True, text=True, timeout=5)
             if 'null' in result.stdout or '0' in result.stdout:
-                # Enable Freeform
                 subprocess.run(['settings', 'put', 'global', 'enable_freeform_windows', '1'], timeout=5)
-                return True  # Was disabled, now enabled
-            return False  # Already enabled
+                enabled = True
         except Exception:
-            return None  # Error
+            pass
+
+        try:
+            subprocess.run(['settings', 'put', 'global', 'enable_freeform_support', '1'], timeout=5)
+        except Exception:
+            pass
+
+        try:
+            subprocess.run(['settings', 'put', 'global', 'force_resizable_activities', '1'], timeout=5)
+        except Exception:
+            pass
+
+        return enabled
 
     async def launch_all(self, package=None, instances=None, delay_sec=None):
         """Launch configured Roblox instances for a selected package."""
