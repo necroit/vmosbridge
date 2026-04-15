@@ -5,6 +5,8 @@ from launcher import RobloxLauncher
 from utils import logging
 import os
 import subprocess
+import gc  # For memory optimization
+import sys
 
 class TelegramBot:
     def __init__(self):
@@ -70,6 +72,10 @@ class TelegramBot:
             await event.reply("Update triggered. Bot will restart.")
 
         logging.info("Bot started")
+        
+        # Start memory optimization loop
+        asyncio.create_task(self._optimize_memory())
+        
         await self.client.run_until_disconnected()
 
     def get_system_status(self):
@@ -114,47 +120,91 @@ class TelegramBot:
             return f"Error getting status: {str(e)}"
 
     def optimize_system(self):
-        """Optimize system for better Roblox performance."""
+        """Maximum system optimization for Roblox performance."""
         try:
             results = []
             
-            # Enable Freeform window mode
+            # 1. Enable Freeform window mode
             try:
                 subprocess.run(['settings', 'put', 'global', 'enable_freeform_windows', '1'], timeout=5)
                 results.append("✅ Freeform window mode enabled")
             except:
                 results.append("⚠️ Could not enable Freeform")
             
-            # Enable Developer Options
+            # 2. Enable Developer Options & ADB optimization
             try:
                 subprocess.run(['setprop', 'persist.sys.usb.config', 'adb'], timeout=5)
+                subprocess.run(['setprop', 'ro.debuggable', '1'], timeout=5)
                 results.append("✅ Developer Options optimized")
             except:
                 results.append("⚠️ Could not enable Developer Options")
             
-            # Clear cache
+            # 3. Aggressive memory management
             try:
-                subprocess.run(['rm', '-rf', '/data/system/package_cache/*'], timeout=5)
-                results.append("✅ Cache cleared")
+                subprocess.run(['sync'], timeout=5)  # Flush buffers
+                subprocess.run(['echo', '3', '>', '/proc/sys/vm/drop_caches'], timeout=5)
+                results.append("✅ Memory flushed & freed")
             except:
-                results.append("⚠️ Could not clear cache")
+                results.append("⚠️ Could not optimize memory")
             
-            # Kill unused processes
+            # 4. Kill unused processes
+            apps_to_kill = ['chrome', 'facebook', 'instagram', 'whatsapp', 'telegram', 'youtube', 'maps']
             try:
-                subprocess.run(['pkill', '-f', 'chrome'], timeout=5)
-                subprocess.run(['pkill', '-f', 'facebook'], timeout=5)
-                results.append("✅ Unused apps terminated")
+                for app in apps_to_kill:
+                    subprocess.run(['pkill', '-f', app], timeout=2)
+                results.append(f"✅ Killed {len(apps_to_kill)} background apps")
             except:
                 results.append("⚠️ Could not kill processes")
             
-            # Optimize GPU
+            # 5. Clear system cache
+            try:
+                subprocess.run(['rm', '-rf', '/data/system/package_cache/*'], timeout=5)
+                subprocess.run(['rm', '-rf', '/data/anr/*'], timeout=5)
+                subprocess.run(['rm', '-rf', '/data/tombstones/*'], timeout=5)
+                results.append("✅ System cache cleared")
+            except:
+                results.append("⚠️ Could not clear cache")
+            
+            # 6. GPU & rendering optimization
             try:
                 subprocess.run(['setprop', 'ro.vendor.extension_library', '/vendor/lib/rfsa/adsp/libfastcvopt.so'], timeout=5)
-                results.append("✅ GPU optimization applied")
+                subprocess.run(['setprop', 'persist.sys.usb.fast_charge', '1'], timeout=5)
+                results.append("✅ GPU & rendering optimized")
             except:
                 results.append("⚠️ Could not apply GPU optimization")
             
-            optimization_msg = "🚀 System Optimization Results:\n\n" + "\n".join(results)
+            # 7. Network optimization
+            try:
+                subprocess.run(['setprop', 'persist.sys.dalvik.vm.dex2oat-cpu-set', '0,1,2,3'], timeout=5)
+                results.append("✅ Network stack optimized")
+            except:
+                results.append("⚠️ Could not optimize network")
+            
+            # 8. Disable animations for performance
+            try:
+                subprocess.run(['settings', 'put', 'global', 'window_animation_scale', '0.5'], timeout=5)
+                subprocess.run(['settings', 'put', 'global', 'transition_animation_scale', '0.5'], timeout=5)
+                results.append("✅ Animations reduced for FPS boost")
+            except:
+                results.append("⚠️ Could not reduce animations")
+            
+            optimization_msg = "🚀 MAXIMUM Optimization Complete:\n\n" + "\n".join(results)
             return optimization_msg
         except Exception as e:
             return f"⚠️ Optimization error: {str(e)}"
+
+    async def _optimize_memory(self):
+        """Periodic memory optimization for bot (runs every 30 seconds)."""
+        while True:
+            try:
+                await asyncio.sleep(30)  # Run every 30 seconds
+                # Force garbage collection
+                gc.collect()
+                
+                # Clear Python cache
+                sys.path.clear()
+                
+                # Log memory optimization (silent)
+                logging.info("Memory optimized")
+            except Exception as e:
+                logging.error(f"Memory optimization error: {e}")

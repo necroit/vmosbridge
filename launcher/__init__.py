@@ -38,13 +38,31 @@ class RobloxLauncher:
             return 'com.roblox.client'
 
     async def launch_instance(self, link, package):
-        """Launch a single Roblox instance with the given link."""
-        command = f'am start -a android.intent.action.VIEW -d "{link}"'
+        """Launch a single Roblox instance with the given link in Freeform window."""
+        # Launch with Freeform window flags
+        command = f'am start -a android.intent.action.VIEW -d "{link}" --windowingMode 2 --display-windowed --task-on-home'
         success, output = run_command(command)
         return success
 
+    def check_and_enable_freeform(self):
+        """Check if Freeform is enabled, if not - enable it."""
+        try:
+            # Check if Freeform is enabled
+            result = subprocess.run(['settings', 'get', 'global', 'enable_freeform_windows'], 
+                                  capture_output=True, text=True, timeout=5)
+            if 'null' in result.stdout or '0' in result.stdout:
+                # Enable Freeform
+                subprocess.run(['settings', 'put', 'global', 'enable_freeform_windows', '1'], timeout=5)
+                return True  # Was disabled, now enabled
+            return False  # Already enabled
+        except Exception:
+            return None  # Error
+
     async def launch_all(self):
-        """Launch multiple instances with delay."""
+        """Launch multiple instances with delay in Freeform window."""
+        # Check and enable Freeform mode
+        freeform_status = self.check_and_enable_freeform()
+        
         package = self.select_package()
         links = self.config.get('roblox_links', [])
         instances = self.config.get('instances', 1)
