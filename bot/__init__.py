@@ -168,12 +168,15 @@ class TelegramBot:
             await event.reply("Перезагружаю телефон...")
             try:
                 commands = [
-                    ['reboot'],
-                    ['svc', 'power', 'reboot'],
-                    ['su', '-c', 'reboot'],
+                    'reboot',
+                    '/system/bin/reboot',
+                    '/system/xbin/reboot',
+                    'svc power reboot',
+                    'su -c reboot',
+                    'su -c "svc power reboot"',
                 ]
                 for cmd in commands:
-                    result = subprocess.run(cmd, timeout=15, capture_output=True, text=True)
+                    result = subprocess.run(cmd, shell=True, timeout=15, capture_output=True, text=True)
                     if result.returncode == 0:
                         return
                 await event.reply("Не удалось перезагрузить телефон. Требуется root или другой уровень доступа.")
