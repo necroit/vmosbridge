@@ -165,9 +165,20 @@ class TelegramBot:
             if not self.is_admin(event):
                 await event.reply("Access denied. Only admin can use this bot.")
                 return
-            await event.reply("Перезапускаю бота...")
-            await asyncio.sleep(2)
-            os.execv(sys.executable, [sys.executable] + [arg for arg in sys.argv if arg != '--boot'])
+            await event.reply("Перезагружаю телефон...")
+            try:
+                commands = [
+                    ['reboot'],
+                    ['svc', 'power', 'reboot'],
+                    ['su', '-c', 'reboot'],
+                ]
+                for cmd in commands:
+                    result = subprocess.run(cmd, timeout=15, capture_output=True, text=True)
+                    if result.returncode == 0:
+                        return
+                await event.reply("Не удалось перезагрузить телефон. Требуется root или другой уровень доступа.")
+            except Exception as e:
+                await event.reply(f"Ошибка перезагрузки: {e}")
 
         logging.info("Bot started")
         await self.send_start_message()
