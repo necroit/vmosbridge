@@ -38,9 +38,9 @@ class RobloxLauncher:
             return 'com.roblox.client'
 
     async def launch_instance(self, link, package):
-        """Launch a single Roblox instance with the given link in Freeform window."""
-        # Launch with Freeform window flags
-        command = f'am start -a android.intent.action.VIEW -d "{link}" --windowingMode 2 --display-windowed --task-on-home'
+        """Launch a single Roblox instance with the given link."""
+        # Use basic Android intent launch; Freeform mode is enabled separately via settings
+        command = f'am start -a android.intent.action.VIEW -d "{link}"'
         success, output = run_command(command)
         return success
 
@@ -84,7 +84,7 @@ class RobloxLauncher:
         # Try multiple methods to stop the app
         methods = [
             f'pkill -f {package}',  # Method 1: pkill by package name
-            f"killall {package.split('.') [-1]}",  # Method 2: killall by app name
+            f'killall {package.split('.')[-1]}',  # Method 2: killall by app name
         ]
         
         for cmd in methods:
